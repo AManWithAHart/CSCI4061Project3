@@ -21,6 +21,25 @@ processing_args_t req_entries[100];
 */
 void * request_handle(void * img_file_path)
 {
+    FILE* file;
+    file = fopen(img_file_path, "rb");
+    if (file == NULL) {
+        perror("Error opening file.");
+        return;
+    }
+    fseek(file, 0, SEEK_END);
+    long int file_length = ftell(file);
+    int connection_fd = setup_connection(port);
+    send_file_to_server(connection_fd, file, file_length);
+    int received_file = receive_file_from_server(connection_fd, output_path);
+    if (received_file == -1) {
+        perror("Error receiving file from server.");
+        return;
+    }
+    int closed_file = fclose(file);
+    if (closed_file == -1) {
+        perror("Error closing file.");
+    }
     return NULL;
 }
 
@@ -64,9 +83,12 @@ int main(int argc, char *argv[])
     /*TODO:  Intermediate Submission
     * 1. Get the input args --> (1) directory path (2) Server Port (3) output path
     */
+    port = argv[2];
+    strcpy(output_path, argv[3]);
 
     /*TODO: Intermediate Submission
     * Call the directory_trav function to traverse the directory and send the images to the server
     */
+    directory_trav(argv[1]);
     return 0;  
 }
