@@ -46,9 +46,9 @@ void * request_handle(void * img_file_path)
 /* Directory traversal function is provided to you. */
 void directory_trav(char * img_directory_path)
 {
-    char dir_path[BUFF_SIZE]; 
+    char dir_path[BUFF_SIZE];
     strcpy(dir_path, img_directory_path);
-    struct dirent *entry; 
+    struct dirent *entry;
     DIR *dir = opendir(dir_path);
     if (dir == NULL)
     {
@@ -83,12 +83,13 @@ int main(int argc, char *argv[])
     /*TODO:  Intermediate Submission
     * 1. Get the input args --> (1) directory path (2) Server Port (3) output path
     */
-    port = argv[2];
+    // int port = argv[2];
+    int port = atoi(argv[2]);
     strcpy(output_path, argv[3]);
 
     /*TODO: Intermediate Submission
     * Call the directory_trav function to traverse the directory and send the images to the server
     */
     directory_trav(argv[1]);
-    return 0;  
+    return 0;
 }
