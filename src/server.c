@@ -2,7 +2,7 @@
 #include <dirent.h>
 
 // /********************* [ Helpful Global Variables ] **********************/
-int num_dispatcher = 0; //Global integer to indicate the number of dispatcher threads   
+int num_dispatcher = 0; //Global integer to indicate the number of dispatcher threads
 int num_worker = 0;  //Global integer to indicate the number of worker threads
 FILE *logfile;  //Global file pointer to the log file
 int queue_len = 0; //Global integer to indicate the length of the queue
@@ -17,12 +17,12 @@ int queue_len = 0; //Global integer to indicate the length of the queue
   What kind of locks will you need to make everything thread safe? [Hint you need multiple]
   What kind of CVs will you need  (i.e. queue full, queue empty) [Hint you need multiple]
   How will you track the number of images in the database?
-  How will you track the requests globally between threads? How will you ensure this is thread safe? Example: request_t req_entries[MAX_QUEUE_LEN]; 
+  How will you track the requests globally between threads? How will you ensure this is thread safe? Example: request_t req_entries[MAX_QUEUE_LEN];
   [multiple funct]  --> How will you update and utilize the current number of requests in the request queue?
-  [worker()]        --> How will you track which index in the request queue to remove next? 
+  [worker()]        --> How will you track which index in the request queue to remove next?
   [dispatcher()]    --> How will you know where to insert the next request received into the request queue?
   [multiple funct]  --> How will you track the p_thread's that you create for workers? TODO
-  How will you store the database of images? What data structure will you use? Example: database_entry_t database[100]; 
+  How will you store the database of images? What data structure will you use? Example: database_entry_t database[100];
 */
 
 pthread_t worker_thread[MAX_THREADS];
@@ -78,22 +78,22 @@ database_entry_t image_match(char *input_image, int size)
   // {
   //   printf("No closest file found.\n");
   // }
-  
-  
+
+
 }
 
 //TODO: Implement this function
 /**********************************************
  * LogPrettyPrint
    - parameters:
-      - to_write is expected to be an open file pointer, or it 
+      - to_write is expected to be an open file pointer, or it
         can be NULL which means that the output is printed to the terminal
       - All other inputs are self explanatory or specified in the writeup
    - returns:
        - no return value
 ************************************************/
 void LogPrettyPrint(FILE* to_write, int threadId, int requestNumber, char * file_name, int file_size){
-  
+
 }
 
 
@@ -117,7 +117,7 @@ void LogPrettyPrint(FILE* to_write, int threadId, int requestNumber, char * file
 
 void loadDatabase(char *path)
 {
-  struct dirent *entry; 
+  struct dirent *entry;
   DIR *dir = opendir(path);
   if (dir == NULL)
   {
@@ -147,8 +147,8 @@ void loadDatabase(char *path)
 
       // Allocate memory to store file contents
       buffer1 = (unsigned char*)malloc(fileLength1 * sizeof(unsigned char));
-    
-      if (buffer1 == NULL) 
+
+      if (buffer1 == NULL)
       {
         printf("Error: Memory allocation failed.\n");
         fclose(fp1);
@@ -167,9 +167,9 @@ void loadDatabase(char *path)
 }
 
 
-void * dispatch(void *thread_id) 
-{   
-  while (1) 
+void * dispatch(void *thread_id)
+{
+  while (1)
   {
     size_t file_size = 0;
     request_detials_t request_details;
@@ -180,25 +180,25 @@ void * dispatch(void *thread_id)
     */
     int fd = accept_connection();
 
-    
+
     /* TODO: Intermediate Submission
     *    Description:      Get request from client
     *    Utility Function: char * get_request_server(int fd, size_t *filelength)
     */
-    char *buffer = get_request_server(fd, file_size);
+    char *buffer = get_request_server(fd, &file_size);
 
    /* TODO
     *    Description:      Add the request into the queue
         //(1) Copy the filename from get_request_server into allocated memory to put on request queue
-        
+
 
         //(2) Request thread safe access to the request queue
 
         //(3) Check for a full queue... wait for an empty one which is signaled from req_queue_notfull
 
         //(4) Insert the request into the queue
-        
-        //(5) Update the queue index in a circular fashion (i.e. update on circular fashion which means when the queue is full we start from the beginning again) 
+
+        //(5) Update the queue index in a circular fashion (i.e. update on circular fashion which means when the queue is full we start from the beginning again)
 
         //(6) Release the lock on the request queue and signal that the queue is not empty anymore
    */
@@ -216,7 +216,7 @@ void * worker(void *thread_id) {
   char *mybuf;                                  //String to hold the contents of the file being requested
 
 
-  /* TODO : Intermediate Submission 
+  /* TODO : Intermediate Submission
   *    Description:      Get the id as an input argument from arg, set it to ID
   */
 
@@ -232,14 +232,14 @@ void * worker(void *thread_id) {
 
       //(4) Update the request queue remove index in a circular fashion
 
-      //(5) Fire the request queue not full signal to indicate the queue has a slot opened up and release the request queue lock  
+      //(5) Fire the request queue not full signal to indicate the queue has a slot opened up and release the request queue lock
       */
-        
-      
+
+
     /* TODO
     *    Description:       Call image_match with the request buffer and file size
     *    store the result into a typeof database_entry_t
-    *    send the file to the client using send_file_to_client(int fd, char * buffer, int size)              
+    *    send the file to the client using send_file_to_client(int fd, char * buffer, int size)
     */
 
     /* TODO
@@ -263,7 +263,7 @@ int main(int argc , char *argv[])
   num_dispatcher      = -1;                               //global variable
   num_worker          = -1;                               //global variable
   queue_len           = -1;                               //global variable
- 
+
 
   /* TODO: Intermediate Submission
   *    Description:      Get the input args --> (1) port (2) database path (3) num_dispatcher (4) num_workers  (5) queue_length
@@ -279,11 +279,11 @@ int main(int argc , char *argv[])
   *    Hint:             Use Global "File* logfile", use "server_log" as the name, what open flags do you want?
   */
   int server_log = fopen(logfile, "r");
- 
+
 
   /* TODO: Intermediate Submission
   *    Description:      Start the server
-  *    Utility Function: void init(int port); //look in utils.h 
+  *    Utility Function: void init(int port); //look in utils.h
   */
   init(port);
 
@@ -294,18 +294,18 @@ int main(int argc , char *argv[])
   loadDatabase(path);
 
   /* TODO: Intermediate Submission
-  *    Description:      Create dispatcher and worker threads 
+  *    Description:      Create dispatcher and worker threads
   *    Hints:            Use pthread_create, you will want to store pthread's globally
   *                      You will want to initialize some kind of global array to pass in thread ID's
   *                      How should you track this p_thread so you can terminate it later? [global]
   */
   for (int i = 0; i < num_dispatcher; i++) {
-    pthread_t *curThread;
+    pthread_t curThread;
     dispatcher_thread[i] = pthread_create(&curThread, NULL, dispatch, NULL);
   }
 
   for (int i = 0; i < num_worker; i++) {
-    pthread_t *curThread;
+    pthread_t curThread;
     worker_thread[i] = pthread_create(&curThread, NULL, worker, NULL);
   }
 
