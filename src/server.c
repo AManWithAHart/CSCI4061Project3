@@ -3,7 +3,7 @@
 
 // /********************* [ Helpful Global Variables ] **********************/
 int num_dispatcher = 0; //Global integer to indicate the number of dispatcher threads
-int num_worker = 0;  //Global integer to indicate the number of worker threads
+int num_worker = 0;  //Global integer to indicate the number of worker threads. Less than N Requests. Less than N Requests
 FILE *logfile;  //Global file pointer to the log file
 int queue_len = 0; //Global integer to indicate the length of the queue
 
@@ -24,19 +24,31 @@ int queue_len = 0; //Global integer to indicate the length of the queue
   [multiple funct]  --> How will you track the p_thread's that you create for workers? TODO
   How will you store the database of images? What data structure will you use? Example: database_entry_t database[100];
 */
-
+// Keep track of worker and dispatcher threads and their ids
 pthread_t worker_thread[MAX_THREADS];
 pthread_t dispatcher_thread[MAX_THREADS];
+int thread_ids[MAX_THREADS*2];
 
+// Our locks and CVs for the lock when swapping between worker and dispatcher
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
-database_entry_t database[100];
-int num_data_entries = 0;
-
 pthread_cond_t queue_full = PTHREAD_COND_INITIALIZER;
 pthread_cond_t queue_empty = PTHREAD_COND_INITIALIZER;
 
-request_t *queue;
+// The database that will hold the images and keep track of how many entries
+database_entry_t database[100];
+int num_data_entries = 0;
+
+// Queue that holds our thread requests (Holds a struct to our image that we will use to select that image)
+request_t queue[MAX_QUEUE_LEN];
+// Request index
+int req_index = 0;
+// Size of our queue
+int queue_size = 0;
+
+// Counter for loading the database
 int counter = 0;
+
+
 
 //TODO: Implement this function
 /**********************************************
@@ -178,14 +190,21 @@ void * dispatch(void *thread_id)
     *    Description:      Accept client connection
     *    Utility Function: int accept_connection(void)
     */
+    // remove when done
+    int tid = pthread_self();
+    printf("Dispatcher TID: %d\n", tid);
+    // Thread hangs here? Maybe needs worker thread to request something
     int fd = accept_connection();
+    printf("Dispatcher accepted connection\n");
 
 
     /* TODO: Intermediate Submission
     *    Description:      Get request from client
     *    Utility Function: char * get_request_server(int fd, size_t *filelength)
     */
+    file_size = lseek(fd, 0, SEEK_END); // Unknown if this is proper way to get filesize
     char *buffer = get_request_server(fd, &file_size);
+    printf("Dispatcher Got Request\n");
 
    /* TODO
     *    Description:      Add the request into the queue
@@ -220,11 +239,13 @@ void * worker(void *thread_id) {
   *    Description:      Get the id as an input argument from arg, set it to ID
   */
 
-  pthread_t *ID = (pthread_t*) thread_id;
-
+  // pthread_t *ID = (pthread_t*) thread_id;
+  pthread_t tid = pthread_self();
+  // remove when done
+  printf("Worker TID: %d\n", tid);
   while (1) {
-    /* TODO
-    *    Description:      Get the request from the queue and do as follows
+      /* TODO
+       *    Description:      Get the request from the queue and do as follows
       //(1) Request thread safe access to the request queue by getting the req_queue_mutex lock
       //(2) While the request queue is empty conditionally wait for the request queue lock once the not empty signal is raised
 
@@ -248,6 +269,7 @@ void * worker(void *thread_id) {
     *    parameters passed in: refer to write up
     */
   }
+  return NULL;
 }
 
 int main(int argc , char *argv[])
@@ -278,7 +300,7 @@ int main(int argc , char *argv[])
   *    Description:      Open log file
   *    Hint:             Use Global "File* logfile", use "server_log" as the name, what open flags do you want?
   */
-  int server_log = fopen(logfile, "r");
+  logfile = fopen(path, "r");
 
 
   /* TODO: Intermediate Submission
@@ -299,14 +321,14 @@ int main(int argc , char *argv[])
   *                      You will want to initialize some kind of global array to pass in thread ID's
   *                      How should you track this p_thread so you can terminate it later? [global]
   */
+  // Creates our num_dispatchers and stores in dispatcher_thread[]
   for (int i = 0; i < num_dispatcher; i++) {
-    pthread_t curThread;
-    dispatcher_thread[i] = pthread_create(&curThread, NULL, dispatch, NULL);
+    int dThread = pthread_create(&dispatcher_thread[i], NULL, dispatch, NULL);
   }
 
+  // Creates our num_workers and stores in worker_thread[]
   for (int i = 0; i < num_worker; i++) {
-    pthread_t curThread;
-    worker_thread[i] = pthread_create(&curThread, NULL, worker, NULL);
+    int wThread = pthread_create(&worker_thread[i], NULL, worker, NULL);
   }
 
 
