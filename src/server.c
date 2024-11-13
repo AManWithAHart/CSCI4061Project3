@@ -62,34 +62,34 @@ int counter = 0;
 //just uncomment out when you are ready to implement this function
 database_entry_t image_match(char *input_image, int size)
 {
-  // const char *closest_file     = NULL;
-	// int         closest_distance = 10;
-  // int closest_index = 0;
-  // for(int i = 0; i < num_data_entries; i++)
-	// {
-	// 	const char *current_file; /* TODO: assign to the buffer from the database struct*/
-	// 	int result = memcmp(input_image, current_file, size);
-	// 	if(result == 0)
-	// 	{
-	// 		return database[i];
-	// 	}
+  const char *closest_file     = NULL;
+	int         closest_distance = 10;
+  int closest_index = 0;
+  for(int i = 0; i < num_data_entries; i++)
+	{
+		const char *current_file = database; /* TODO: assign to the buffer from the database struct*/
+		int result = memcmp(input_image, current_file, size);
+		if(result == 0)
+		{
+			return database[i];
+		}
 
-	// 	else if(result < closest_distance)
-	// 	{
-	// 		closest_distance = result;
-	// 		closest_file     = current_file;
-  //     closest_index = i;
-	// 	}
-	// }
+		else if(result < closest_distance)
+		{
+			closest_distance = result;
+			closest_file     = current_file;
+      closest_index = i;
+		}
+	}
 
-	// if(closest_file != NULL)
-	// {
-  //   return database[closest_index];
-	// }
-  // else
-  // {
-  //   printf("No closest file found.\n");
-  // }
+	if(closest_file != NULL)
+	{
+    return database[closest_index];
+	}
+  else
+  {
+    printf("No closest file found.\n");
+  }
 
 
 }
@@ -191,8 +191,8 @@ void * dispatch(void *thread_id)
     *    Utility Function: int accept_connection(void)
     */
     // remove when done
-    int tid = pthread_self();
-    printf("Dispatcher TID: %d\n", tid);
+    // int tid = pthread_self();
+    // printf("Dispatcher TID: %d\n", tid);
     // Thread hangs here? Maybe needs worker thread to request something
     int fd = accept_connection();
     printf("Dispatcher accepted connection\n");
@@ -240,13 +240,15 @@ void * worker(void *thread_id) {
   */
 
   // pthread_t *ID = (pthread_t*) thread_id;
-  pthread_t tid = pthread_self();
+  int* ID = (int*) thread_id;
   // remove when done
-  printf("Worker TID: %d\n", tid);
+  printf("Worker TID: %d\n", &ID);
+
   while (1) {
       /* TODO
        *    Description:      Get the request from the queue and do as follows
       //(1) Request thread safe access to the request queue by getting the req_queue_mutex lock
+
       //(2) While the request queue is empty conditionally wait for the request queue lock once the not empty signal is raised
 
       //(3) Now that you have the lock AND the queue is not empty, read from the request queue
@@ -295,6 +297,7 @@ int main(int argc , char *argv[])
   num_dispatcher = atoi(argv[3]);
   num_worker = atoi(argv[4]);
   queue_len = atoi(argv[5]);
+  //printf("%d, %s, %d, %d, %d \n", port, path, num_dispatcher, num_worker, queue_len);
 
   /* TODO: Intermediate Submission
   *    Description:      Open log file
@@ -323,12 +326,20 @@ int main(int argc , char *argv[])
   */
   // Creates our num_dispatchers and stores in dispatcher_thread[]
   for (int i = 0; i < num_dispatcher; i++) {
-    int dThread = pthread_create(&dispatcher_thread[i], NULL, dispatch, NULL);
+    int dThread = pthread_create(&dispatcher_thread[i], NULL, dispatch, (void*) i);
+    if (dThread != 0) {
+      perror("Cannot make dispatcher");
+      return -1;
+    }
   }
 
   // Creates our num_workers and stores in worker_thread[]
   for (int i = 0; i < num_worker; i++) {
-    int wThread = pthread_create(&worker_thread[i], NULL, worker, NULL);
+    int dThread = pthread_create(&worker_thread[i], NULL, worker, (void *) i);
+    if (dThread != 0) {
+      perror("Cannot make worker");
+      return -1;
+    }
   }
 
 
@@ -343,7 +354,7 @@ int main(int argc , char *argv[])
     }
   }
   for(i = 0; i < num_worker; i++){
-   // fprintf(stderr, "JOINING WORKER %d \n",i);
+   fprintf(stderr, "JOINING WORKER %d \n",i);
     if((pthread_join(worker_thread[i], NULL)) != 0){
       printf("ERROR : Fail to join worker thread %d.\n", i);
     }

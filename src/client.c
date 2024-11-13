@@ -29,13 +29,21 @@ void * request_handle(void * img_file_path)
     }
     fseek(file, 0, SEEK_END);
     long int file_length = ftell(file);
+
+
     int connection_fd = setup_connection(port);
-    send_file_to_server(connection_fd, file, file_length);
+    int sentFile = send_file_to_server(connection_fd, file, file_length);
+    if (sentFile != 0) {
+        perror("Error sending file to server");
+        return;
+    }
     int received_file = receive_file_from_server(connection_fd, output_path);
     if (received_file == -1) {
         perror("Error receiving file from server.");
         return;
     }
+
+    printf("FILE RECIEVED");
     int closed_file = fclose(file);
     if (closed_file == -1) {
         perror("Error closing file.");
@@ -83,13 +91,14 @@ int main(int argc, char *argv[])
     /*TODO:  Intermediate Submission
     * 1. Get the input args --> (1) directory path (2) Server Port (3) output path
     */
-    // int port = argv[2];
     int port = atoi(argv[2]);
     strcpy(output_path, argv[3]);
 
     /*TODO: Intermediate Submission
     * Call the directory_trav function to traverse the directory and send the images to the server
     */
-    directory_trav(argv[1]);
+    char *directoryPath;
+    strcpy(directoryPath, argv[1]);
+    directory_trav(directoryPath);
     return 0;
 }
