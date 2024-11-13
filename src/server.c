@@ -242,9 +242,10 @@ void * worker(void *thread_id) {
   // pthread_t *ID = (pthread_t*) thread_id;
   int* ID = (int*) thread_id;
   // remove when done
-  printf("Worker TID: %d\n", &ID);
+  printf("Worker TID: %d\n", *ID);
 
   while (1) {
+      break;
       /* TODO
        *    Description:      Get the request from the queue and do as follows
       //(1) Request thread safe access to the request queue by getting the req_queue_mutex lock
@@ -326,7 +327,7 @@ int main(int argc , char *argv[])
   */
   // Creates our num_dispatchers and stores in dispatcher_thread[]
   for (int i = 0; i < num_dispatcher; i++) {
-    int dThread = pthread_create(&dispatcher_thread[i], NULL, dispatch, (void*) i);
+    int dThread = pthread_create(&dispatcher_thread[i], NULL, dispatch, (void*) &i);
     if (dThread != 0) {
       perror("Cannot make dispatcher");
       return -1;
@@ -335,7 +336,7 @@ int main(int argc , char *argv[])
 
   // Creates our num_workers and stores in worker_thread[]
   for (int i = 0; i < num_worker; i++) {
-    int dThread = pthread_create(&worker_thread[i], NULL, worker, (void *) i);
+    int dThread = pthread_create(&worker_thread[i], NULL, worker, (void *) &i);
     if (dThread != 0) {
       perror("Cannot make worker");
       return -1;

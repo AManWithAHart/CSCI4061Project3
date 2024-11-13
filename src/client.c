@@ -91,14 +91,12 @@ int main(int argc, char *argv[])
     /*TODO:  Intermediate Submission
     * 1. Get the input args --> (1) directory path (2) Server Port (3) output path
     */
-    int port = atoi(argv[2]);
+    port = atoi(argv[2]);
     strcpy(output_path, argv[3]);
 
     /*TODO: Intermediate Submission
     * Call the directory_trav function to traverse the directory and send the images to the server
     */
-    char *directoryPath;
-    strcpy(directoryPath, argv[1]);
-    directory_trav(directoryPath);
+    directory_trav(argv[1]);
     return 0;
 }
