@@ -30,9 +30,10 @@ pthread_t dispatcher_thread[MAX_THREADS];
 int thread_ids[MAX_THREADS*2];
 
 // Our locks and CVs for the lock when swapping between worker and dispatcher
-pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t queue_access = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t queue_full = PTHREAD_COND_INITIALIZER;
 pthread_cond_t queue_empty = PTHREAD_COND_INITIALIZER;
+pthread_cond_t queue_not_empty = PTHREAD_COND_INITIALIZER;
 
 // The database that will hold the images and keep track of how many entries
 database_entry_t database[100];
@@ -206,21 +207,42 @@ void * dispatch(void *thread_id)
     char *buffer = get_request_server(fd, &file_size);
     printf("Dispatcher Got Request\n");
 
-   /* TODO
+   
+   //(1) Copy the filename from get_request_server into allocated memory to put on request queue
+   request_t *cur_request = malloc(sizeof(request_t));
+   strcpy(cur_request->buffer, buffer);
+   
+   //(2) Request thread safe access to the request queue
+   pthread_mutex_lock(&buffer_access);
+
+   //(3) Check for a full queue... wait for an empty one which is signaled from req_queue_notfull
+   while(queue_size == MAX_QUEUE_LEN) {
+      wait(&queue_empty, &buffer_access);
+   }
+
+   //(4) Insert the request into the queue
+   queue[queue_size + 1] = cur_request;
+
+  //(5) Update the queue index in a circular fashion (i.e. update on circular fashion which means when the queue is full we start from the beginning again)
+  queue_size += 1; //CHECK THIS LINE
+
+  //(6) Release the lock on the request queue and signal that the queue is not empty anymore
+  signal(&queue_not_empty);
+  pthread_mutex_unlock(&buffer_access);
+
+
+  //WHOLE STEP BY STEP IS DONE ABOVE
+  /* TODO
     *    Description:      Add the request into the queue
         //(1) Copy the filename from get_request_server into allocated memory to put on request queue
-
-
         //(2) Request thread safe access to the request queue
-
         //(3) Check for a full queue... wait for an empty one which is signaled from req_queue_notfull
-
         //(4) Insert the request into the queue
-
         //(5) Update the queue index in a circular fashion (i.e. update on circular fashion which means when the queue is full we start from the beginning again)
-
         //(6) Release the lock on the request queue and signal that the queue is not empty anymore
    */
+
+
   }
     return NULL;
 }
@@ -245,7 +267,28 @@ void * worker(void *thread_id) {
   printf("Worker TID: %d\n", *ID);
 
   while (1) {
-      break;
+    //(1) Request thread safe access to the request queue by getting the req_queue_mutex lock
+    pthread_mutex_lock(&buffer_access);
+
+
+    //(2) While the request queue is empty conditionally wait for the request queue lock once the not empty signal is raised    
+    while(queue_size == 0) {
+      wait(&queue_not_empty, &buffer_access);
+    }
+
+    //(3) Now that you have the lock AND the queue is not empty, read from the request queue
+    request_t requested_image = queue[queue_size];
+
+    //(4) Update the request queue remove index in a circular fashion
+    queue_size--;
+
+    //(5) Fire the request queue not full signal to indicate the queue has a slot opened up and release the request queue lock
+    signal(&queue_empty);
+    pthread_mutex_unlock(&buffer_access);
+  
+
+
+
       /* TODO
        *    Description:      Get the request from the queue and do as follows
       //(1) Request thread safe access to the request queue by getting the req_queue_mutex lock
@@ -265,6 +308,7 @@ void * worker(void *thread_id) {
     *    store the result into a typeof database_entry_t
     *    send the file to the client using send_file_to_client(int fd, char * buffer, int size)
     */
+    database_entry_t image = image_match(requested_image->buffer, requested_image->file_size);
 
     /* TODO
     *    Description:       Call LogPrettyPrint() to print server log
