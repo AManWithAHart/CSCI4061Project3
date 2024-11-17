@@ -40,9 +40,10 @@ database_entry_t database[100];
 int num_data_entries = 0;
 
 // Queue that holds our thread requests (Holds a struct to our image that we will use to select that image)
-request_t queue[MAX_QUEUE_LEN];
+request_t *queue[MAX_QUEUE_LEN];
 // Request index
 int req_index = 0;
+int queue_position = 0;
 // Size of our queue
 int queue_size = 0;
 
@@ -63,33 +64,33 @@ int counter = 0;
 //just uncomment out when you are ready to implement this function
 database_entry_t image_match(char *input_image, int size)
 {
-  const char *closest_file     = NULL;
-	int         closest_distance = 10;
+  const char *closest_file = NULL;
+  int closest_distance = 10;
   int closest_index = 0;
   for(int i = 0; i < num_data_entries; i++)
 	{
-		const char *current_file = database; /* TODO: assign to the buffer from the database struct*/
+		const char *current_file = database[i].buffer; /* TODO: assign to the buffer from the database struct*/
 		int result = memcmp(input_image, current_file, size);
-		if(result == 0)
-		{
-			return database[i];
-		}
 
-		else if(result < closest_distance)
-		{
-			closest_distance = result;
-			closest_file     = current_file;
-      closest_index = i;
-		}
-	}
+        if(result == 0)
+        {
+            return database[i];
+        }
+        else if(result < closest_distance)
+        {
+            closest_distance = result;
+            closest_file     = current_file;
+            closest_index = i;
+        }
+    }
 
-	if(closest_file != NULL)
-	{
-    return database[closest_index];
-	}
+  if(closest_file != NULL)
+  {
+      return database[closest_index];
+  }
   else
   {
-    printf("No closest file found.\n");
+      printf("No closest file found.\n");
   }
 
 
@@ -109,25 +110,7 @@ void LogPrettyPrint(FILE* to_write, int threadId, int requestNumber, char * file
 
 }
 
-
-/*
-  TODO: Implement this function for Intermediate Submission
-  * loadDatabase
-    - parameters:
-        - path is the path to the directory containing the images
-    - returns:
-        - no return value
-    - Description:
-        - Traverse the directory and load all the images into the database
-          - Load the images from the directory into the database
-          - You will need to read the images into memory
-          - You will need to store the file name in the database_entry_t struct
-          - You will need to store the file size in the database_entry_t struct
-          - You will need to store the image data in the database_entry_t struct
-          - You will need to increment the number of images in the database
-*/
-/***********/
-
+/* Given by TA */
 void loadDatabase(char *path)
 {
   struct dirent *entry;
@@ -191,10 +174,6 @@ void * dispatch(void *thread_id)
     *    Description:      Accept client connection
     *    Utility Function: int accept_connection(void)
     */
-    // remove when done
-    // int tid = pthread_self();
-    // printf("Dispatcher TID: %d\n", tid);
-    // Thread hangs here? Maybe needs worker thread to request something
     int fd = accept_connection();
     printf("Dispatcher accepted connection\n");
 
@@ -203,32 +182,50 @@ void * dispatch(void *thread_id)
     *    Description:      Get request from client
     *    Utility Function: char * get_request_server(int fd, size_t *filelength)
     */
-    file_size = lseek(fd, 0, SEEK_END); // Unknown if this is proper way to get filesize
+    file_size = lseek(fd, 0, SEEK_END);
     char *buffer = get_request_server(fd, &file_size);
-    printf("Dispatcher Got Request\n");
+    // printf("Size of buffer: %d\n", file_size);
 
-   
+
    //(1) Copy the filename from get_request_server into allocated memory to put on request queue
    request_t *cur_request = malloc(sizeof(request_t));
-   strcpy(cur_request->buffer, buffer);
-   
-   //(2) Request thread safe access to the request queue
-   pthread_mutex_lock(&buffer_access);
 
-   //(3) Check for a full queue... wait for an empty one which is signaled from req_queue_notfull
-   while(queue_size == MAX_QUEUE_LEN) {
-      wait(&queue_empty, &buffer_access);
+   // Need to initialize buffer since it's a pointer to an array in the struct
+   cur_request->buffer = malloc(sizeof(buffer));
+
+   // Copy the contents to the request
+   strcpy(cur_request->buffer, buffer);
+   cur_request->file_size = file_size;
+   cur_request->file_descriptor = fd;
+
+    // printf("Malloc cur_request\n");
+
+   //(2) Request thread safe access to the request queue
+   pthread_mutex_lock(&queue_access);
+   // printf("Locking\n");
+
+   //(3) Check for anything in queue... wait for an empty one which is signaled from req_queue_notfull
+   while(queue_size != 0) {
+      pthread_cond_wait(&queue_empty, &queue_access);
    }
 
    //(4) Insert the request into the queue
-   queue[queue_size + 1] = cur_request;
+   queue[queue_position] = cur_request;
 
   //(5) Update the queue index in a circular fashion (i.e. update on circular fashion which means when the queue is full we start from the beginning again)
-  queue_size += 1; //CHECK THIS LINE
 
+  // Set the latest position for the request
+   queue_position++;
+   if (queue_position == MAX_QUEUE_LEN) {
+       queue_position = 0;
+   }
+   else {
+       queue_position++;
+   }
+   queue_size++;
   //(6) Release the lock on the request queue and signal that the queue is not empty anymore
-  signal(&queue_not_empty);
-  pthread_mutex_unlock(&buffer_access);
+  pthread_cond_signal(&queue_not_empty);
+  pthread_mutex_unlock(&queue_access);
 
 
   //WHOLE STEP BY STEP IS DONE ABOVE
@@ -264,31 +261,35 @@ void * worker(void *thread_id) {
   // pthread_t *ID = (pthread_t*) thread_id;
   int* ID = (int*) thread_id;
   // remove when done
-  printf("Worker TID: %d\n", *ID);
+  // printf("Worker TID: %d\n", *ID);
 
   while (1) {
     //(1) Request thread safe access to the request queue by getting the req_queue_mutex lock
-    pthread_mutex_lock(&buffer_access);
+    pthread_mutex_lock(&queue_access);
 
-
-    //(2) While the request queue is empty conditionally wait for the request queue lock once the not empty signal is raised    
+    //(2) While the request queue is empty conditionally wait for the request queue lock once the not empty signal is raised
     while(queue_size == 0) {
-      wait(&queue_not_empty, &buffer_access);
+      pthread_cond_wait(&queue_not_empty, &queue_access);
     }
 
     //(3) Now that you have the lock AND the queue is not empty, read from the request queue
-    request_t requested_image = queue[queue_size];
+    request_t *requested_image = queue[req_index];
 
     //(4) Update the request queue remove index in a circular fashion
+    // Increase our request index in a circular manner
+    req_index++;
+    if (req_index == MAX_QUEUE_LEN) {
+        req_index = 0;
+    }
+    else {
+        req_index++;
+    }
+    // Decrease the queue size since the worker finished the request
     queue_size--;
 
     //(5) Fire the request queue not full signal to indicate the queue has a slot opened up and release the request queue lock
-    signal(&queue_empty);
-    pthread_mutex_unlock(&buffer_access);
-  
-
-
-
+    pthread_cond_signal(&queue_empty);
+    pthread_mutex_unlock(&queue_access);
       /* TODO
        *    Description:      Get the request from the queue and do as follows
       //(1) Request thread safe access to the request queue by getting the req_queue_mutex lock
@@ -308,7 +309,11 @@ void * worker(void *thread_id) {
     *    store the result into a typeof database_entry_t
     *    send the file to the client using send_file_to_client(int fd, char * buffer, int size)
     */
+    printf("Matching image\n");
+    printf("Buffer: %s; Size: %d\n", requested_image->buffer, requested_image->file_size);
     database_entry_t image = image_match(requested_image->buffer, requested_image->file_size);
+    // printf("sending image\n");
+    send_file_to_client(requested_image->file_descriptor, image.buffer, image.file_size);
 
     /* TODO
     *    Description:       Call LogPrettyPrint() to print server log
@@ -348,7 +353,7 @@ int main(int argc , char *argv[])
   *    Description:      Open log file
   *    Hint:             Use Global "File* logfile", use "server_log" as the name, what open flags do you want?
   */
-  logfile = fopen(path, "r");
+  logfile = fopen("server_log", "r");
 
 
   /* TODO: Intermediate Submission
@@ -406,5 +411,4 @@ int main(int argc , char *argv[])
   }
   fprintf(stderr, "SERVER DONE \n");  // will never be reached in SOLUTION
   fclose(logfile);//closing the log files
-
 }

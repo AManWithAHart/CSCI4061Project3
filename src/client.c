@@ -25,22 +25,25 @@ void * request_handle(void * img_file_path)
     file = fopen(img_file_path, "rb");
     if (file == NULL) {
         perror("Error opening file.");
-        return;
+        exit(-1);
     }
     fseek(file, 0, SEEK_END);
     long int file_length = ftell(file);
 
 
     int connection_fd = setup_connection(port);
+    // send_file_to_server does not have a return value
+    printf("sending file_path: %s\n", (char *) img_file_path);
     int sentFile = send_file_to_server(connection_fd, file, file_length);
-    if (sentFile != 0) {
-        perror("Error sending file to server");
-        return;
-    }
+    // if (sentFile != 0) {
+    //     perror("Error sending file to server\n");
+    //     return;
+    // }
     int received_file = receive_file_from_server(connection_fd, output_path);
+    printf("Output path: %s\n", output_path);
     if (received_file == -1) {
-        perror("Error receiving file from server.");
-        return;
+        perror("Error receiving file from server.\n");
+        exit(-1);
     }
 
     printf("FILE RECIEVED");
