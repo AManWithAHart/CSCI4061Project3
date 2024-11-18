@@ -179,6 +179,9 @@ void * dispatch(void *thread_id)
     int fd = accept_connection();
     printf("Dispatcher accepted connection\n");
 
+    
+   //LOCK START 
+    
    //(2) Request thread safe access to the request queue
    pthread_mutex_lock(&queue_access);
    
@@ -222,10 +225,16 @@ void * dispatch(void *thread_id)
        queue_position++;
    }
    queue_size++;
+   
+   
   //(6) Release the lock on the request queue and signal that the queue is not empty anymore
   pthread_cond_signal(&queue_not_empty);
   pthread_mutex_unlock(&queue_access);
 
+  
+  //LOCK END
+  
+  
 
   //WHOLE STEP BY STEP IS DONE ABOVE
   /* TODO
@@ -257,17 +266,14 @@ void * worker(void *thread_id) {
   *    Description:      Get the id as an input argument from arg, set it to ID
   */
 
-  // pthread_t *ID = (pthread_t*) thread_id;
-  int* ID = (int*) thread_id;
-  // remove when done
-  // printf("Worker TID: %d\n", *ID);
-
   while (1) {
     //(1) Request thread safe access to the request queue by getting the req_queue_mutex lock
     pthread_mutex_lock(&queue_access);
 
+    int* ID = (int*) thread_id;
+
     //(2) While the request queue is empty conditionally wait for the request queue lock once the not empty signal is raised
-    while(queue_size <= 0) {
+    while(queue_size == 0) {
       pthread_cond_wait(&queue_not_empty, &queue_access);
     }
 
@@ -287,8 +293,6 @@ void * worker(void *thread_id) {
     queue_size--;
 
     //(5) Fire the request queue not full signal to indicate the queue has a slot opened up and release the request queue lock
-    pthread_cond_signal(&queue_empty);
-    pthread_mutex_unlock(&queue_access);
     
     /* TODO
     *    Description:       Call image_match with the request buffer and file size
@@ -297,6 +301,9 @@ void * worker(void *thread_id) {
     */
     database_entry_t image = image_match(requested_image->buffer, requested_image->file_size);
     send_file_to_client(requested_image->file_descriptor, image.buffer, image.file_size);
+    pthread_cond_signal(&queue_empty);
+    pthread_mutex_unlock(&queue_access);
+    
     
     
       /* TODO
@@ -358,7 +365,11 @@ int main(int argc , char *argv[])
   *    Description:      Open log file
   *    Hint:             Use Global "File* logfile", use "server_log" as the name, what open flags do you want?
   */
-  logfile = fopen("server_log", "r");
+  logfile = fopen("server_log", "w");
+  if (logfile == NULL) {
+    perror("failed to open server log");
+    exit(-1);
+  }
 
 
   /* TODO: Intermediate Submission

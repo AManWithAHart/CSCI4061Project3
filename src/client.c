@@ -22,6 +22,8 @@ processing_args_t req_entries[100];
 void * request_handle(void * img_file_path)
 {
     char out_dir_path[1028];
+    //get image_file_path name and cat with output_path;
+
     FILE* file;
     file = fopen(img_file_path, "rb");
     if (file == NULL) {
@@ -30,12 +32,19 @@ void * request_handle(void * img_file_path)
     }
     fseek(file, 0, SEEK_END);
     long int file_length = ftell(file);
+    rewind(file);
 
     int connection_fd = setup_connection(port);
     int sentFile = send_file_to_server(connection_fd, file, file_length);
-    int received_file = receive_file_from_server(connection_fd, output_path);
     
-    printf("Output path: %s\n", output_path);
+    
+    if (sentFile == -1) {
+      perror("Failed to send file.\n");
+      exit(-1);
+    }
+    
+    int received_file = receive_file_from_server(connection_fd, out_dir_path);
+    
     if (received_file == -1) {
         perror("Error receiving file from server.\n");
         exit(-1);
