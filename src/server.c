@@ -51,7 +51,6 @@ int queue_size = 0;
 int counter = 0;
 
 
-
 //TODO: Implement this function
 /**********************************************
  * image_match
@@ -107,7 +106,10 @@ database_entry_t image_match(char *input_image, int size)
        - no return value
 ************************************************/
 void LogPrettyPrint(FILE* to_write, int threadId, int requestNumber, char * file_name, int file_size){
-
+  if (to_write == NULL) {
+  
+  
+  }
 }
 
 /* Given by TA */
@@ -177,16 +179,17 @@ void * dispatch(void *thread_id)
     int fd = accept_connection();
     printf("Dispatcher accepted connection\n");
 
-
-    /* TODO: Intermediate Submission
+   //(2) Request thread safe access to the request queue
+   pthread_mutex_lock(&queue_access);
+   
+   /* TODO: Intermediate Submission
     *    Description:      Get request from client
     *    Utility Function: char * get_request_server(int fd, size_t *filelength)
-    */
-    file_size = lseek(fd, 0, SEEK_END);
-    char *buffer = get_request_server(fd, &file_size);
-    // printf("Size of buffer: %d\n", file_size);
-
-
+   */
+   file_size = lseek(fd, 0, SEEK_END);
+   char *buffer = get_request_server(fd, &file_size);
+   
+   
    //(1) Copy the filename from get_request_server into allocated memory to put on request queue
    request_t *cur_request = malloc(sizeof(request_t));
 
@@ -197,15 +200,11 @@ void * dispatch(void *thread_id)
    strcpy(cur_request->buffer, buffer);
    cur_request->file_size = file_size;
    cur_request->file_descriptor = fd;
-
-    // printf("Malloc cur_request\n");
-
-   //(2) Request thread safe access to the request queue
-   pthread_mutex_lock(&queue_access);
-   // printf("Locking\n");
+   printf("REQUEST Buffer: %s; Size: %d\n", buffer, cur_request->file_size);
+   
 
    //(3) Check for anything in queue... wait for an empty one which is signaled from req_queue_notfull
-   while(queue_size != 0) {
+   while(queue_size >= MAX_QUEUE_LEN) { //QUEUE NEEDS TO BE FULL
       pthread_cond_wait(&queue_empty, &queue_access);
    }
 
@@ -268,7 +267,7 @@ void * worker(void *thread_id) {
     pthread_mutex_lock(&queue_access);
 
     //(2) While the request queue is empty conditionally wait for the request queue lock once the not empty signal is raised
-    while(queue_size == 0) {
+    while(queue_size <= 0) {
       pthread_cond_wait(&queue_not_empty, &queue_access);
     }
 
@@ -290,6 +289,16 @@ void * worker(void *thread_id) {
     //(5) Fire the request queue not full signal to indicate the queue has a slot opened up and release the request queue lock
     pthread_cond_signal(&queue_empty);
     pthread_mutex_unlock(&queue_access);
+    
+    /* TODO
+    *    Description:       Call image_match with the request buffer and file size
+    *    store the result into a typeof database_entry_t
+    *    send the file to the client using send_file_to_client(int fd, char * buffer, int size)
+    */
+    database_entry_t image = image_match(requested_image->buffer, requested_image->file_size);
+    send_file_to_client(requested_image->file_descriptor, image.buffer, image.file_size);
+    
+    
       /* TODO
        *    Description:      Get the request from the queue and do as follows
       //(1) Request thread safe access to the request queue by getting the req_queue_mutex lock
@@ -303,17 +312,13 @@ void * worker(void *thread_id) {
       //(5) Fire the request queue not full signal to indicate the queue has a slot opened up and release the request queue lock
       */
 
-
     /* TODO
     *    Description:       Call image_match with the request buffer and file size
     *    store the result into a typeof database_entry_t
     *    send the file to the client using send_file_to_client(int fd, char * buffer, int size)
     */
-    printf("Matching image\n");
-    printf("Buffer: %s; Size: %d\n", requested_image->buffer, requested_image->file_size);
-    database_entry_t image = image_match(requested_image->buffer, requested_image->file_size);
-    // printf("sending image\n");
-    send_file_to_client(requested_image->file_descriptor, image.buffer, image.file_size);
+    //printf("Matching image\n");
+    //printf("Buffer: %s; Size: %d\n", requested_image->buffer, requested_image->file_size);
 
     /* TODO
     *    Description:       Call LogPrettyPrint() to print server log

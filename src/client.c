@@ -21,6 +21,7 @@ processing_args_t req_entries[100];
 */
 void * request_handle(void * img_file_path)
 {
+    char out_dir_path[1028];
     FILE* file;
     file = fopen(img_file_path, "rb");
     if (file == NULL) {
@@ -30,16 +31,10 @@ void * request_handle(void * img_file_path)
     fseek(file, 0, SEEK_END);
     long int file_length = ftell(file);
 
-
     int connection_fd = setup_connection(port);
-    // send_file_to_server does not have a return value
-    printf("sending file_path: %s\n", (char *) img_file_path);
     int sentFile = send_file_to_server(connection_fd, file, file_length);
-    // if (sentFile != 0) {
-    //     perror("Error sending file to server\n");
-    //     return;
-    // }
     int received_file = receive_file_from_server(connection_fd, output_path);
+    
     printf("Output path: %s\n", output_path);
     if (received_file == -1) {
         perror("Error receiving file from server.\n");
@@ -95,8 +90,9 @@ int main(int argc, char *argv[])
     * 1. Get the input args --> (1) directory path (2) Server Port (3) output path
     */
     port = atoi(argv[2]);
+    
     strcpy(output_path, argv[3]);
-
+    printf("PORT: %d, PATH: %s\n", port, output_path);
     /*TODO: Intermediate Submission
     * Call the directory_trav function to traverse the directory and send the images to the server
     */
