@@ -107,9 +107,22 @@ database_entry_t image_match(char *input_image, int size)
 ************************************************/
 void LogPrettyPrint(FILE* to_write, int threadId, int requestNumber, char * file_name, int file_size){
   if (to_write == NULL) {
-  
-  
-  }
+// print out to stdout
+  printf("****** Server Log Begin ******");
+  printf("Thread ID: %d\n", threadId);
+  printf("Request Number: %d\n", requestNumber);
+  printf("File Name: %s\n", file_name);
+  printf("File Size: %d\n", file_size);
+  printf("****** Server Log End ******");
+}
+else {
+  fprintf(to_write,"****** Server Log Begin ******");
+  fprintf(to_write, "Thread ID: %d\n", threadId);
+  fprintf(to_write,"Request Number: %d\n", requestNumber);
+  fprintf(to_write,"File Name: %s\n", file_name);
+  fprintf(to_write,"File Size: %d\n", file_size);
+  fprintf(to_write,"****** Server Log End ******");
+}
 }
 
 /* Given by TA */
@@ -304,6 +317,7 @@ void * worker(void *thread_id) {
     pthread_cond_signal(&queue_empty);
     pthread_mutex_unlock(&queue_access);
     
+    LogPrettyPrint(NULL, thread_id, req_index, "TBD", image.file_size);
     
     
       /* TODO

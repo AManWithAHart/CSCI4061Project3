@@ -23,6 +23,9 @@ void * request_handle(void * img_file_path)
 {
     char out_dir_path[1028];
     //get image_file_path name and cat with output_path;
+    strcat(out_dir_path, "output/");
+    strcpy(out_dir_path, img_file_path);
+
 
     FILE* file;
     file = fopen(img_file_path, "rb");
