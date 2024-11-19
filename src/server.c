@@ -171,6 +171,7 @@ void loadDatabase(char *path)
       database[counter].buffer = buffer1;
       database[counter].file_size = fileLength1;
       counter++;
+      num_data_entries++;
     }
   }
 
@@ -197,13 +198,17 @@ void * dispatch(void *thread_id)
     
    //(2) Request thread safe access to the request queue
    pthread_mutex_lock(&queue_access);
-   
+   printf("DISPATCHER GOT THE LOCK\n");
    /* TODO: Intermediate Submission
     *    Description:      Get request from client
     *    Utility Function: char * get_request_server(int fd, size_t *filelength)
    */
    file_size = lseek(fd, 0, SEEK_END);
-   char *buffer = get_request_server(fd, &file_size);
+   size_t rewind = lseek(fd, 0, SEEK_SET);
+
+   printf("REQUESTING FORM SERVER\n");
+   char *buffer = get_request_server(fd, &file_size); //THIS IS BROKEN LMAO
+   printf("GOT SOME STUFF FROM SERVER\n");
    
    
    //(1) Copy the filename from get_request_server into allocated memory to put on request queue
@@ -221,9 +226,11 @@ void * dispatch(void *thread_id)
 
    //(3) Check for anything in queue... wait for an empty one which is signaled from req_queue_notfull
    while(queue_size >= MAX_QUEUE_LEN) { //QUEUE NEEDS TO BE FULL
+      printf("WAITING\n");
       pthread_cond_wait(&queue_empty, &queue_access);
    }
 
+  printf("CHECKPOINT\n");
    //(4) Insert the request into the queue
    queue[queue_position] = cur_request;
 
@@ -281,12 +288,14 @@ void * worker(void *thread_id) {
 
   while (1) {
     //(1) Request thread safe access to the request queue by getting the req_queue_mutex lock
+    printf("GOING FOR THE LOCK WORKER\n");
     pthread_mutex_lock(&queue_access);
 
     int* ID = (int*) thread_id;
 
     //(2) While the request queue is empty conditionally wait for the request queue lock once the not empty signal is raised
     while(queue_size == 0) {
+      printf("QUEUE EMPTY: WAITING\n");
       pthread_cond_wait(&queue_not_empty, &queue_access);
     }
 

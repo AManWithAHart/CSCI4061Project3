@@ -23,8 +23,8 @@ void * request_handle(void * img_file_path)
 {
     char out_dir_path[1028];
     //get image_file_path name and cat with output_path;
-    strcat(out_dir_path, "output/");
-    strcpy(out_dir_path, img_file_path);
+    strcpy(out_dir_path, "output/");
+    strcat(out_dir_path, img_file_path);
 
 
     FILE* file;
@@ -33,14 +33,16 @@ void * request_handle(void * img_file_path)
         perror("Error opening file.");
         exit(-1);
     }
+
     fseek(file, 0, SEEK_END);
     long int file_length = ftell(file);
+    printf("FILE LENGTH: %ld\n", file_length);
     rewind(file);
 
     int connection_fd = setup_connection(port);
+    //error check
+
     int sentFile = send_file_to_server(connection_fd, file, file_length);
-    
-    
     if (sentFile == -1) {
       perror("Failed to send file.\n");
       exit(-1);
@@ -53,7 +55,6 @@ void * request_handle(void * img_file_path)
         exit(-1);
     }
 
-    printf("FILE RECIEVED");
     int closed_file = fclose(file);
     if (closed_file == -1) {
         perror("Error closing file.");
