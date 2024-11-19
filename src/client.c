@@ -40,7 +40,10 @@ void * request_handle(void * img_file_path)
     rewind(file);
 
     int connection_fd = setup_connection(port);
-    //error check
+    if (connection_fd == -1) {
+        perror("CANNOT ESTABLISH CONNECTION");
+        exit(-1);
+    }
 
     int sentFile = send_file_to_server(connection_fd, file, file_length);
     if (sentFile == -1) {
