@@ -32,7 +32,6 @@ int thread_ids[MAX_THREADS*2];
 // Our locks and CVs for the lock when swapping between worker and dispatcher
 pthread_mutex_t queue_access = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t queue_full = PTHREAD_COND_INITIALIZER;
-pthread_cond_t queue_empty = PTHREAD_COND_INITIALIZER;
 pthread_cond_t queue_not_empty = PTHREAD_COND_INITIALIZER;
 
 // The database that will hold the images and keep track of how many entries
@@ -62,38 +61,41 @@ int counter = 0;
        - database_entry_t that is the closest match to the input_image
 ************************************************/
 //just uncomment out when you are ready to implement this function
-database_entry_t image_match(char *input_image, int size)
-{
-  const char *closest_file = NULL;
-  int closest_distance = 10;
-  int closest_index = 0;
-  for(int i = 0; i < num_data_entries; i++)
-	{
-		const char *current_file = database[i].buffer; /* TODO: assign to the buffer from the database struct*/
-		int result = memcmp(input_image, current_file, size);
+database_entry_t image_match(char *input_image, int size) {
+  int closest_distance = INT_MAX;
+  int closest_index = -1;
 
-        if(result == 0)
-        {
-            return database[i];
-        }
-        else if(result < closest_distance)
-        {
-            closest_distance = result;
-            closest_file     = current_file;
-            closest_index = i;
-        }
+  for (int i = 0; i < num_data_entries; i++) {
+		int distance = 0;
+    const char *db_image = database[i].buffer;
+
+    int comp_size;
+    
+    if (size < database[i].file_size) {
+      comp_size = size;
+    } else {
+      comp_size = database[i].file_size;
     }
 
-  if(closest_file != NULL)
-  {
-      return database[closest_index];
-  }
-  else
-  {
-      printf("No closest file found.\n");
+    for (int j = 0; j < comp_size; j++) {
+      distance += abs((unsigned char) input_image[j] - (unsigned char)db_image[i]);
+    }
+
+    distance += abs(size - database[i].file_size);
+
+    if (distance < closest_distance) {
+      closest_distance = distance;
+      closest_index = i;
+    }
   }
 
+  if (closest_index >= 0) {
+    printf("This is the closest index: %d\n", closest_index);
+    return database[closest_index];
+  } 
 
+  printf("No closest file found.\n");
+  return database[0];
 }
 
 //TODO: Implement this function
@@ -106,24 +108,20 @@ database_entry_t image_match(char *input_image, int size)
    - returns:
        - no return value
 ************************************************/
-void LogPrettyPrint(FILE* to_write, int threadId, int requestNumber, char * file_name, int file_size){
+void LogPrettyPrint(FILE* to_write, int threadId, int requestNumber, char * file_name, int file_size) {
 
 }
 
 /* Given by TA */
-void loadDatabase(char *path)
-{
+void loadDatabase(char *path) {
   struct dirent *entry;
   DIR *dir = opendir(path);
-  if (dir == NULL)
-  {
+  if (dir == NULL) {
     perror("Opendir ERROR");
     exit(0);
   }
-  while ((entry = readdir(dir)) != NULL)
-  {
-    if(strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0 && strcmp(entry->d_name, ".DS_Store") != 0)
-    {
+  while ((entry = readdir(dir)) != NULL) {
+    if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0 && strcmp(entry->d_name, ".DS_Store") != 0) {
       sprintf(database[counter].file_name, "%s/%s", path, entry->d_name);
       FILE *fp1;
       unsigned char *buffer1 = NULL;
@@ -132,8 +130,8 @@ void loadDatabase(char *path)
       // Open the image files
       fp1 = fopen(database[counter].file_name, "rb");
       if (fp1 == NULL) {
-          perror("Error: Unable to open image files.\n");
-          exit(1);
+        perror("Error: Unable to open image files.\n");
+        exit(1);
       }
 
       // Get the length of file 1
@@ -142,10 +140,9 @@ void loadDatabase(char *path)
       rewind(fp1);
 
       // Allocate memory to store file contents
-      buffer1 = (unsigned char*)malloc(fileLength1 * sizeof(unsigned char));
+      buffer1 = (unsigned char*) malloc(fileLength1 * sizeof(unsigned char));
 
-      if (buffer1 == NULL)
-      {
+      if (buffer1 == NULL) {
         printf("Error: Memory allocation failed.\n");
         fclose(fp1);
         if (buffer1 != NULL) free(buffer1);
@@ -156,92 +153,61 @@ void loadDatabase(char *path)
       database[counter].buffer = buffer1;
       database[counter].file_size = fileLength1;
       counter++;
+      num_data_entries++;
     }
   }
-
   closedir(dir);
 }
 
 
-void * dispatch(void *thread_id)
-{
-  while (1)
-  {
+void * dispatch(void *thread_id) {
+  while (1) {
     size_t file_size = 0;
     request_detials_t request_details;
 
-    /* TODO: Intermediate Submission
-    *    Description:      Accept client connection
-    *    Utility Function: int accept_connection(void)
-    */
     int fd = accept_connection();
     printf("Dispatcher accepted connection\n");
 
-
-    /* TODO: Intermediate Submission
-    *    Description:      Get request from client
-    *    Utility Function: char * get_request_server(int fd, size_t *filelength)
-    */
-    file_size = lseek(fd, 0, SEEK_END);
     char *buffer = get_request_server(fd, &file_size);
-    // printf("Size of buffer: %d\n", file_size);
+    if (!buffer || file_size == 0) {
+      perror("Failed to get request");
+      close(fd);
+      continue;
+    }
 
+    //(1) Copy the filename from get_request_server into allocated memory to put on request queue
+    request_t *cur_request = malloc(sizeof(request_t));
 
-   //(1) Copy the filename from get_request_server into allocated memory to put on request queue
-   request_t *cur_request = malloc(sizeof(request_t));
+    // Need to initialize buffer since it's a pointer to an array in the struct
+    cur_request->buffer = malloc(file_size);
 
-   // Need to initialize buffer since it's a pointer to an array in the struct
-   cur_request->buffer = malloc(sizeof(buffer));
+    // Copy the contents to the request
+    memcmp(cur_request->buffer, buffer, file_size);
+    cur_request->file_size = file_size;
+    cur_request->file_descriptor = fd;
 
-   // Copy the contents to the request
-   strcpy(cur_request->buffer, buffer);
-   cur_request->file_size = file_size;
-   cur_request->file_descriptor = fd;
+    //(2) Request thread safe access to the request queue
+    pthread_mutex_lock(&queue_access);
 
-    // printf("Malloc cur_request\n");
+    //(3) Check for anything in queue... wait for an empty one which is signaled from req_queue_notfull
+    while (queue_position >= MAX_QUEUE_LEN) {
+      pthread_cond_wait(&queue_full, &queue_access);
+    }
 
-   //(2) Request thread safe access to the request queue
-   pthread_mutex_lock(&queue_access);
-   // printf("Locking\n");
+    //(4) Insert the request into the queue
+    queue[queue_position] = cur_request;
 
-   //(3) Check for anything in queue... wait for an empty one which is signaled from req_queue_notfull
-   while(queue_size != 0) {
-      pthread_cond_wait(&queue_empty, &queue_access);
-   }
-
-   //(4) Insert the request into the queue
-   queue[queue_position] = cur_request;
-
-  //(5) Update the queue index in a circular fashion (i.e. update on circular fashion which means when the queue is full we start from the beginning again)
-
-  // Set the latest position for the request
-   queue_position++;
-   if (queue_position == MAX_QUEUE_LEN) {
-       queue_position = 0;
-   }
-   else {
-       queue_position++;
-   }
-   queue_size++;
-  //(6) Release the lock on the request queue and signal that the queue is not empty anymore
-  pthread_cond_signal(&queue_not_empty);
-  pthread_mutex_unlock(&queue_access);
-
-
-  //WHOLE STEP BY STEP IS DONE ABOVE
-  /* TODO
-    *    Description:      Add the request into the queue
-        //(1) Copy the filename from get_request_server into allocated memory to put on request queue
-        //(2) Request thread safe access to the request queue
-        //(3) Check for a full queue... wait for an empty one which is signaled from req_queue_notfull
-        //(4) Insert the request into the queue
-        //(5) Update the queue index in a circular fashion (i.e. update on circular fashion which means when the queue is full we start from the beginning again)
-        //(6) Release the lock on the request queue and signal that the queue is not empty anymore
-   */
-
-
+    //(5) Update the queue index in a circular fashion (i.e. update on circular fashion which means when the queue is full we start from the beginning again)
+    // Set the latest position for the request
+    queue_position = (queue_position + 1) % MAX_QUEUE_LEN;
+    queue_size++;
+  
+    //(6) Release the lock on the request queue and signal that the queue is not empty anymore
+    pthread_cond_signal(&queue_not_empty);
+    pthread_mutex_unlock(&queue_access);
+    free(buffer);
   }
-    return NULL;
+  return NULL;
 }
 
 void * worker(void *thread_id) {
@@ -260,9 +226,7 @@ void * worker(void *thread_id) {
 
   // pthread_t *ID = (pthread_t*) thread_id;
   int* ID = (int*) thread_id;
-  // remove when done
-  // printf("Worker TID: %d\n", *ID);
-
+  
   while (1) {
     //(1) Request thread safe access to the request queue by getting the req_queue_mutex lock
     pthread_mutex_lock(&queue_access);
@@ -277,32 +241,14 @@ void * worker(void *thread_id) {
 
     //(4) Update the request queue remove index in a circular fashion
     // Increase our request index in a circular manner
-    req_index++;
-    if (req_index == MAX_QUEUE_LEN) {
-        req_index = 0;
-    }
-    else {
-        req_index++;
-    }
+    req_index = (req_index + 1) % MAX_QUEUE_LEN;
+
     // Decrease the queue size since the worker finished the request
     queue_size--;
 
     //(5) Fire the request queue not full signal to indicate the queue has a slot opened up and release the request queue lock
-    pthread_cond_signal(&queue_empty);
+    pthread_cond_signal(&queue_full);
     pthread_mutex_unlock(&queue_access);
-      /* TODO
-       *    Description:      Get the request from the queue and do as follows
-      //(1) Request thread safe access to the request queue by getting the req_queue_mutex lock
-
-      //(2) While the request queue is empty conditionally wait for the request queue lock once the not empty signal is raised
-
-      //(3) Now that you have the lock AND the queue is not empty, read from the request queue
-
-      //(4) Update the request queue remove index in a circular fashion
-
-      //(5) Fire the request queue not full signal to indicate the queue has a slot opened up and release the request queue lock
-      */
-
 
     /* TODO
     *    Description:       Call image_match with the request buffer and file size
@@ -312,7 +258,6 @@ void * worker(void *thread_id) {
     printf("Matching image\n");
     printf("Buffer: %s; Size: %d\n", requested_image->buffer, requested_image->file_size);
     database_entry_t image = image_match(requested_image->buffer, requested_image->file_size);
-    // printf("sending image\n");
     send_file_to_client(requested_image->file_descriptor, image.buffer, image.file_size);
 
     /* TODO
@@ -324,13 +269,11 @@ void * worker(void *thread_id) {
   return NULL;
 }
 
-int main(int argc , char *argv[])
-{
-   if(argc != 6){
+int main(int argc , char *argv[]) {
+  if (argc != 6) {
     printf("usage: %s port path num_dispatcher num_workers queue_length \n", argv[0]);
     return -1;
   }
-
 
   int port            = -1;
   char path[BUFF_SIZE] = "no path set\0";
@@ -338,34 +281,16 @@ int main(int argc , char *argv[])
   num_worker          = -1;                               //global variable
   queue_len           = -1;                               //global variable
 
-
-  /* TODO: Intermediate Submission
-  *    Description:      Get the input args --> (1) port (2) database path (3) num_dispatcher (4) num_workers  (5) queue_length
-  */
   port = atoi(argv[1]);
   strcpy(path, argv[2]);
   num_dispatcher = atoi(argv[3]);
   num_worker = atoi(argv[4]);
   queue_len = atoi(argv[5]);
-  //printf("%d, %s, %d, %d, %d \n", port, path, num_dispatcher, num_worker, queue_len);
 
-  /* TODO: Intermediate Submission
-  *    Description:      Open log file
-  *    Hint:             Use Global "File* logfile", use "server_log" as the name, what open flags do you want?
-  */
-  logfile = fopen("server_log", "r");
+  logfile = fopen("server_log", "w+"); // Open in write mode
 
-
-  /* TODO: Intermediate Submission
-  *    Description:      Start the server
-  *    Utility Function: void init(int port); //look in utils.h
-  */
   init(port);
 
-  /* TODO : Intermediate Submission
-  *    Description:      Load the database
-  *    Function: void loadDatabase(char *path); // prototype in server.h
-  */
   loadDatabase(path);
 
   /* TODO: Intermediate Submission
@@ -376,7 +301,8 @@ int main(int argc , char *argv[])
   */
   // Creates our num_dispatchers and stores in dispatcher_thread[]
   for (int i = 0; i < num_dispatcher; i++) {
-    int dThread = pthread_create(&dispatcher_thread[i], NULL, dispatch, (void*) &i);
+    thread_ids[i] = i;
+    int dThread = pthread_create(&dispatcher_thread[i], NULL, dispatch, (void*) &thread_ids[i]);
     if (dThread != 0) {
       perror("Cannot make dispatcher");
       return -1;
@@ -385,27 +311,27 @@ int main(int argc , char *argv[])
 
   // Creates our num_workers and stores in worker_thread[]
   for (int i = 0; i < num_worker; i++) {
-    int dThread = pthread_create(&worker_thread[i], NULL, worker, (void *) &i);
+    thread_ids[i] = i;
+    int dThread = pthread_create(&worker_thread[i], NULL, worker, (void *) &thread_ids[i]);
     if (dThread != 0) {
       perror("Cannot make worker");
       return -1;
     }
   }
 
-
-
   // Wait for each of the threads to complete their work
   // Threads (if created) will not exit (see while loop), but this keeps main from exiting
   int i;
-  for(i = 0; i < num_dispatcher; i++){
+  for (i = 0; i < num_dispatcher; i++) {
     fprintf(stderr, "JOINING DISPATCHER %d \n",i);
-    if((pthread_join(dispatcher_thread[i], NULL)) != 0){
-      printf("ERROR : Fail to join dispatcher thread %d.\n", i);
+    if ((pthread_join(dispatcher_thread[i], NULL)) != 0) {
+      printf("ERROR : Fail to join dispatcher thread %d.\n", i);  
     }
   }
-  for(i = 0; i < num_worker; i++){
-   fprintf(stderr, "JOINING WORKER %d \n",i);
-    if((pthread_join(worker_thread[i], NULL)) != 0){
+
+  for (i = 0; i < num_worker; i++) {
+    fprintf(stderr, "JOINING WORKER %d \n",i);
+    if ((pthread_join(worker_thread[i], NULL)) != 0) {
       printf("ERROR : Fail to join worker thread %d.\n", i);
     }
   }
