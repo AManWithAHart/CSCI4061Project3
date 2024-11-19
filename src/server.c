@@ -109,8 +109,26 @@ database_entry_t image_match(char *input_image, int size) {
        - no return value
 ************************************************/
 void LogPrettyPrint(FILE* to_write, int threadId, int requestNumber, char * file_name, int file_size) {
-
+  if (to_write == NULL) {
+// print out to stdout
+    printf("****** Server Log Begin ******\n");
+    printf("Thread ID: %d\n", threadId);
+    printf("Request Number: %d\n", requestNumber);
+    printf("File Name: %s\n", file_name);
+    printf("File Size: %d\n", file_size);
+    printf("****** Server Log End ******\n");
+    printf("\n");
+} else {
+    fprintf(to_write,"****** Server Log Begin ******\n");
+    fprintf(to_write, "Thread ID: %d\n", threadId);
+    fprintf(to_write,"Request Number: %d\n", requestNumber);
+    fprintf(to_write,"File Name: %s\n", file_name);
+    fprintf(to_write,"File Size: %d\n", file_size);
+    fprintf(to_write,"****** Server Log End ******\n");
+    fprintf(to_write, "\n");
+  }
 }
+
 
 /* Given by TA */
 void loadDatabase(char *path) {
@@ -265,6 +283,7 @@ void * worker(void *thread_id) {
     *    update the # of request (include the current one) this thread has already done, you may want to have a global array to store the number for each thread
     *    parameters passed in: refer to write up
     */
+    LogPrettyPrint(logfile, &thread_id, req_index, "TBD", image.file_size);
   }
   return NULL;
 }
@@ -287,7 +306,7 @@ int main(int argc , char *argv[]) {
   num_worker = atoi(argv[4]);
   queue_len = atoi(argv[5]);
 
-  logfile = fopen("server_log", "w+"); // Open in write mode
+  logfile = fopen("server_log", "a");
 
   init(port);
 
