@@ -42,8 +42,9 @@ int queue_size = 0;
        - database_entry_t that is the closest match to the input_image
 ************************************************/
 database_entry_t image_match(char *input_image, int size) {
-  int closest_distance = INT_MAX;
+  int closest_distance = 10;
   int closest_index = -1;
+  const char* closest_file = NULL;
 
   for (int i = 0; i < num_data_entries; i++) {
     const char *db_image = database[i].buffer;
@@ -51,18 +52,18 @@ database_entry_t image_match(char *input_image, int size) {
 
     if (result == 0) {
       return database[i];
-    } else {
+    } else if (result < closest_distance) {
       closest_distance = result;
       closest_index = i;
+      closest_file = db_image;
     }
   }
 
-  if (closest_index >= 0) {
+  if (closest_file != NULL) {
     return database[closest_index];
   }
 
   printf("No closest file found.\n");
-  return database[0];
 }
 
 /**********************************************
@@ -237,7 +238,7 @@ void * worker(void *thread_id) {
     // Print the results in server_log
     logfile = fopen("server_log", "a");
     LogPrettyPrint(
-      logfile, &thread_id, req_index, image.file_name, image.file_size);
+      logfile, req_index, 0, image.file_name, image.file_size);
     fclose(logfile);
   }
   return NULL;
