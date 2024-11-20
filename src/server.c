@@ -238,13 +238,14 @@ void * worker(void *thread_id) {
     // Print the results in server_log
     logfile = fopen("server_log", "a");
     LogPrettyPrint(
-      logfile, req_index, 0, image.file_name, image.file_size);
+      logfile, *ID, req_index, image.file_name, image.file_size);
     fclose(logfile);
   }
   return NULL;
 }
 
 int main(int argc , char *argv[]) {
+  // Ensures correct usage of server
   if (argc != 6) {
     printf("usage: %s port path num_dispatcher num_workers queue_length \n",
            argv[0]);
