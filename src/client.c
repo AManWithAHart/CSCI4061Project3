@@ -37,7 +37,7 @@ void * request_handle(void * img_file_path) {
   long int file_length = ftell(file);
   rewind(file);
 
-
+  //set up connection with the port passed in through main
   int connection_fd = setup_connection(port);
   if (connection_fd == -1) {
     perror("CANNOT ESTABLISH CONNECTION");
@@ -52,12 +52,14 @@ void * request_handle(void * img_file_path) {
     exit(-1);
   }
 
+  //recieve our file from the server
   int received_file = receive_file_from_server(connection_fd, out_dir_path);
   if (received_file == -1) {
     perror("Error receiving file from server.\n");
     exit(-1);
   }
 
+  //close file
   int closed_file = fclose(file);
   if (closed_file == -1) {
     perror("Error closing file.");

@@ -103,12 +103,14 @@ database_entry_t image_match(char *input_image, int size) {
        - no return value
 ************************************************/
 void LogPrettyPrint(FILE* to_write, int threadId, int requestNumber, char * file_name, int file_size) {
+  
   if (to_write != -1) {
     // print out to server_log
     fprintf(to_write, "[%d][%d][%s][%d]\n", threadId, requestNumber, file_name, file_size);
   } else {
     printf("ERROR WRITING TO LOGFILE\n");
   }
+    // prints to stdout
     printf("[%d][%d][%s][%d]\n", threadId, requestNumber, file_name, file_size);
 }
 
@@ -167,6 +169,12 @@ void * dispatch(void *thread_id) {
     request_detials_t request_details;
 
     int fd = accept_connection();
+    if (fd < 0) {
+      perror("Failed to get connection");
+      exit(-1);
+    }
+
+    //Confirm Connection
     printf("Dispatcher accepted connection\n");
 
     char *buffer = get_request_server(fd, &file_size);
@@ -222,12 +230,10 @@ void * worker(void *thread_id) {
   char *mybuf;                                  //String to hold the contents of the file being requested
 
 
-  /* TODO : Intermediate Submission
-  *    Description:      Get the id as an input argument from arg, set it to ID
-  */
 
-  // pthread_t *ID = (pthread_t*) thread_id;
-  int* ID = (int*) thread_id;
+
+  //Description:      Get the id as an input argument from arg, set it to ID
+  int ID = (int) thread_id;
   
   while (1) {
     //(1) Request thread safe access to the request queue by getting the req_queue_mutex lock
@@ -248,28 +254,23 @@ void * worker(void *thread_id) {
     // Decrease the queue size since the worker finished the request
     queue_size--;
 
+    //get our image using image match and send the image to the client
     database_entry_t image = image_match(requested_image->buffer, requested_image->file_size);
-    send_file_to_client(requested_image->file_descriptor, image.buffer, image.file_size);
+    int client_send = send_file_to_client(requested_image->file_descriptor, image.buffer, image.file_size);
+    if (client_send == -1) {
+      perror("Failed to send file to client");
+      exit(-1);
+    }
 
-    /* TODO
-    *    Description:       Call LogPrettyPrint() to print server log
-    *    update the # of request (include the current one) this thread has already done, you may want to have a global array to store the number for each thread
-    *    parameters passed in: refer to write up
-    */
-    //LogPrettyPrint(logfile, *ID, req_index, image.file_name, image.file_size);
-
-    // Print the results in server_log
+  
+    // Print the results in server_log and stdout
     logfile = fopen("server_log", "a");
-    LogPrettyPrint(logfile, &ID, req_index, image.file_name, image.file_size);
+    LogPrettyPrint(logfile, ID, req_index, image.file_name, image.file_size);
     fclose(logfile);
 
     //(5) Fire the request queue not full signal to indicate the queue has a slot opened up and release the request queue lock
     pthread_cond_signal(&queue_full);
     pthread_mutex_unlock(&queue_access);
-
-    
-    //printf("Matching image\n");
-    //printf("Buffer: %s; Size: %d\n", requested_image->buffer, requested_image->file_size);
 
   }
   return NULL;
@@ -342,5 +343,4 @@ int main(int argc , char *argv[]) {
     }
   }
   fprintf(stderr, "SERVER DONE \n");  // will never be reached in SOLUTION
-  //fclose(logfile);//closing the log files
 }
