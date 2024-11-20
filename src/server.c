@@ -62,40 +62,34 @@ int counter = 0;
 ************************************************/
 //just uncomment out when you are ready to implement this function
 database_entry_t image_match(char *input_image, int size) {
+  const char *closest_file = NULL;
   int closest_distance = INT_MAX;
-  int closest_index = -1;
+  int closest_index = 0;
+  for(int i = 0; i < num_data_entries; i++)
+	{
+		const char *current_file = database[i].buffer; /* TODO: assign to the buffer from the database struct*/
+		int result = memcmp(input_image, current_file, size);
 
-  for (int i = 0; i < num_data_entries; i++) {
-		int distance = 0;
-    const char *db_image = database[i].buffer;
-
-    int comp_size;
-    
-    if (size < database[i].file_size) {
-      comp_size = size;
-    } else {
-      comp_size = database[i].file_size;
+        if(result == 0)
+        {
+            return database[i];
+        }
+        else if(result < closest_distance)
+        {
+            closest_distance = result;
+            closest_file     = current_file;
+            closest_index = i;
+        }
     }
 
-    for (int j = 0; j < comp_size; j++) {
-      distance += abs((unsigned char) input_image[j] - (unsigned char)db_image[i]);
-    }
-
-    distance += abs(size - database[i].file_size);
-
-    if (distance < closest_distance) {
-      closest_distance = distance;
-      closest_index = i;
-    }
+  if(closest_file != NULL)
+  {
+      return database[closest_index];
   }
-
-  if (closest_index >= 0) {
-    printf("This is the closest index: %d\n", closest_index);
-    return database[closest_index];
-  } 
-
-  printf("No closest file found.\n");
-  return database[0];
+  else
+  {
+      printf("No closest file found.\n");
+  }
 }
 
 //TODO: Implement this function
@@ -109,24 +103,13 @@ database_entry_t image_match(char *input_image, int size) {
        - no return value
 ************************************************/
 void LogPrettyPrint(FILE* to_write, int threadId, int requestNumber, char * file_name, int file_size) {
-  if (to_write == NULL) {
-// print out to stdout
-    printf("****** Server Log Begin ******\n");
-    printf("Thread ID: %d\n", threadId);
-    printf("Request Number: %d\n", requestNumber);
-    printf("File Name: %s\n", file_name);
-    printf("File Size: %d\n", file_size);
-    printf("****** Server Log End ******\n");
-    printf("\n");
-} else {
-    fprintf(to_write,"****** Server Log Begin ******\n");
-    fprintf(to_write, "Thread ID: %d\n", threadId);
-    fprintf(to_write,"Request Number: %d\n", requestNumber);
-    fprintf(to_write,"File Name: %s\n", file_name);
-    fprintf(to_write,"File Size: %d\n", file_size);
-    fprintf(to_write,"****** Server Log End ******\n");
-    fprintf(to_write, "\n");
+  if (to_write != -1) {
+    // print out to server_log
+    fprintf(to_write, "[%d][%d][%s][%d]\n", threadId, requestNumber, file_name, file_size);
+  } else {
+    printf("ERROR WRITING TO LOGFILE\n");
   }
+    printf("[%d][%d][%s][%d]\n", threadId, requestNumber, file_name, file_size);
 }
 
 
@@ -200,7 +183,7 @@ void * dispatch(void *thread_id) {
     cur_request->buffer = malloc(file_size);
 
     // Copy the contents to the request
-    memcmp(cur_request->buffer, buffer, file_size);
+    memcpy(cur_request->buffer, buffer, file_size);
     cur_request->file_size = file_size;
     cur_request->file_descriptor = fd;
 
@@ -219,6 +202,7 @@ void * dispatch(void *thread_id) {
     // Set the latest position for the request
     queue_position = (queue_position + 1) % MAX_QUEUE_LEN;
     queue_size++;
+
   
     //(6) Release the lock on the request queue and signal that the queue is not empty anymore
     pthread_cond_signal(&queue_not_empty);
@@ -264,17 +248,6 @@ void * worker(void *thread_id) {
     // Decrease the queue size since the worker finished the request
     queue_size--;
 
-    //(5) Fire the request queue not full signal to indicate the queue has a slot opened up and release the request queue lock
-    pthread_cond_signal(&queue_full);
-    pthread_mutex_unlock(&queue_access);
-
-    /* TODO
-    *    Description:       Call image_match with the request buffer and file size
-    *    store the result into a typeof database_entry_t
-    *    send the file to the client using send_file_to_client(int fd, char * buffer, int size)
-    */
-    printf("Matching image\n");
-    printf("Buffer: %s; Size: %d\n", requested_image->buffer, requested_image->file_size);
     database_entry_t image = image_match(requested_image->buffer, requested_image->file_size);
     send_file_to_client(requested_image->file_descriptor, image.buffer, image.file_size);
 
@@ -283,7 +256,21 @@ void * worker(void *thread_id) {
     *    update the # of request (include the current one) this thread has already done, you may want to have a global array to store the number for each thread
     *    parameters passed in: refer to write up
     */
-    LogPrettyPrint(logfile, &thread_id, req_index, "TBD", image.file_size);
+    //LogPrettyPrint(logfile, *ID, req_index, image.file_name, image.file_size);
+
+    // Print the results in server_log
+    logfile = fopen("server_log", "a");
+    LogPrettyPrint(logfile, &ID, req_index, image.file_name, image.file_size);
+    fclose(logfile);
+
+    //(5) Fire the request queue not full signal to indicate the queue has a slot opened up and release the request queue lock
+    pthread_cond_signal(&queue_full);
+    pthread_mutex_unlock(&queue_access);
+
+    
+    //printf("Matching image\n");
+    //printf("Buffer: %s; Size: %d\n", requested_image->buffer, requested_image->file_size);
+
   }
   return NULL;
 }
@@ -306,7 +293,7 @@ int main(int argc , char *argv[]) {
   num_worker = atoi(argv[4]);
   queue_len = atoi(argv[5]);
 
-  logfile = fopen("server_log", "a");
+  //logfile = fopen("server_log", "w");
 
   init(port);
 
@@ -321,7 +308,7 @@ int main(int argc , char *argv[]) {
   // Creates our num_dispatchers and stores in dispatcher_thread[]
   for (int i = 0; i < num_dispatcher; i++) {
     thread_ids[i] = i;
-    int dThread = pthread_create(&dispatcher_thread[i], NULL, dispatch, (void*) &thread_ids[i]);
+    int dThread = pthread_create(&dispatcher_thread[i], NULL, dispatch, thread_ids[i]);
     if (dThread != 0) {
       perror("Cannot make dispatcher");
       return -1;
@@ -331,7 +318,7 @@ int main(int argc , char *argv[]) {
   // Creates our num_workers and stores in worker_thread[]
   for (int i = 0; i < num_worker; i++) {
     thread_ids[i] = i;
-    int dThread = pthread_create(&worker_thread[i], NULL, worker, (void *) &thread_ids[i]);
+    int dThread = pthread_create(&worker_thread[i], NULL, worker, thread_ids[i]);
     if (dThread != 0) {
       perror("Cannot make worker");
       return -1;
@@ -355,5 +342,5 @@ int main(int argc , char *argv[]) {
     }
   }
   fprintf(stderr, "SERVER DONE \n");  // will never be reached in SOLUTION
-  fclose(logfile);//closing the log files
+  //fclose(logfile);//closing the log files
 }
