@@ -14,8 +14,8 @@ Justin: nguy4574
 Matthew: hartm622
 Neven: zuvic003
 Sam: bassa050
-Contributions
 
+Contributions:
 - Sam Bassan: Worked on getting the client side working. Error checked and got LogPrintPretty working
 - Matthew Hartman: Created skeleton code for server side and bug fixed for server and client. Cleaned up code and added comments.
 - Justin Nguyen: Bug fixed for server and client side. Built upon skeleton code in server side.
