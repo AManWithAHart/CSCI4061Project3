@@ -1,7 +1,5 @@
 #include "../include/client.h"
 
-
-
 int port = 0;
 
 pthread_t worker_thread[100];
@@ -10,15 +8,6 @@ char output_path[1028];
 
 processing_args_t req_entries[100];
 
-/* TODO: implement the request_handle function to send the image to the server and recieve the processed image
-* 1. Open the file in the read-binary mode (i.e. "rb" mode) - Intermediate Submission
-* 2. Get the file length using the fseek and ftell functions - Intermediate Submission
-* 3. set up the connection with the server using the setup_connection(int port) function - Intermediate Submission
-* 4. Send the file to the server using the send_file_to_server(int fd, FILE *file, int size) function - Intermediate Submission
-* 5. Receive the processed image from the server using the receive_file_from_server(int socket, char *file_path) function
-* 6. receive_file_from_server saves the processed image in the output directory, so pass in the right directory path
-* 7. Close the file
-*/
 void * request_handle(void * img_file_path) {
   
   char out_dir_path[1028];
@@ -98,6 +87,7 @@ int main(int argc, char *argv[]) {
     exit(-1);
   }
   
+  //get our arguments and assign them accordingly
   port = atoi(argv[2]);
   strcpy(output_path, argv[3]);
 

@@ -9,21 +9,6 @@ int queue_len = 0; //Global integer to indicate the length of the queue
 
 #define WORKER_DISPATCHER 100
 
-/* TODO: Intermediate Submission
-  TODO: Add any global variables that you may need to track the requests and threads
-  [multiple funct]  --> How will you track the p_thread's that you create for workers?
-  [multiple funct]  --> How will you track the p_thread's that you create for dispatchers?
-  [multiple funct]  --> Might be helpful to track the ID's of your threads in a global array
-  What kind of locks will you need to make everything thread safe? [Hint you need multiple]
-  What kind of CVs will you need  (i.e. queue full, queue empty) [Hint you need multiple]
-  How will you track the number of images in the database?
-  How will you track the requests globally between threads? How will you ensure this is thread safe? Example: request_t req_entries[MAX_QUEUE_LEN];
-  [multiple funct]  --> How will you update and utilize the current number of requests in the request queue?
-  [worker()]        --> How will you track which index in the request queue to remove next?
-  [dispatcher()]    --> How will you know where to insert the next request received into the request queue?
-  [multiple funct]  --> How will you track the p_thread's that you create for workers? TODO
-  How will you store the database of images? What data structure will you use? Example: database_entry_t database[100];
-*/
 // Keep track of worker and dispatcher threads and their ids
 pthread_t worker_thread[MAX_THREADS];
 pthread_t dispatcher_thread[MAX_THREADS];
@@ -49,25 +34,14 @@ int queue_size = 0;
 // Counter for loading the database
 int counter = 0;
 
-
-
-//TODO: Implement this function
-/**********************************************
- * image_match
-   - parameters:
-      - input_image is the image data to compare
-      - size is the size of the image data
-   - returns:
-       - database_entry_t that is the closest match to the input_image
-************************************************/
-//just uncomment out when you are ready to implement this function
+//Image Match to find the closest image
 database_entry_t image_match(char *input_image, int size) {
   const char *closest_file = NULL;
   int closest_distance = INT_MAX;
   int closest_index = 0;
   for(int i = 0; i < num_data_entries; i++)
 	{
-		const char *current_file = database[i].buffer; /* TODO: assign to the buffer from the database struct*/
+		const char *current_file = database[i].buffer;
 		int result = memcmp(input_image, current_file, size);
 
         if(result == 0)
@@ -92,16 +66,7 @@ database_entry_t image_match(char *input_image, int size) {
   }
 }
 
-//TODO: Implement this function
-/**********************************************
- * LogPrettyPrint
-   - parameters:
-      - to_write is expected to be an open file pointer, or it
-        can be NULL which means that the output is printed to the terminal
-      - All other inputs are self explanatory or specified in the writeup
-   - returns:
-       - no return value
-************************************************/
+//LogPrettyPrint prints out to our server log and to stdout
 void LogPrettyPrint(FILE* to_write, int threadId, int requestNumber, char * file_name, int file_size) {
   
   if (to_write != -1) {
@@ -294,18 +259,11 @@ int main(int argc , char *argv[]) {
   num_worker = atoi(argv[4]);
   queue_len = atoi(argv[5]);
 
-  //logfile = fopen("server_log", "w");
-
   init(port);
 
   loadDatabase(path);
 
-  /* TODO: Intermediate Submission
-  *    Description:      Create dispatcher and worker threads
-  *    Hints:            Use pthread_create, you will want to store pthread's globally
-  *                      You will want to initialize some kind of global array to pass in thread ID's
-  *                      How should you track this p_thread so you can terminate it later? [global]
-  */
+ 
   // Creates our num_dispatchers and stores in dispatcher_thread[]
   for (int i = 0; i < num_dispatcher; i++) {
     thread_ids[i] = i;
